@@ -138,3 +138,163 @@
             <button class="close-about" onclick="hideAbout()">Close</button>
         </div>
     </div>
+    <!-- Firebase SDK (Module) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        // ==========================================
+        // আপনার আসল Firebase Config 
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAoi2WjWKUaxHmbxnR9uydpDAeEZpOwSUw",
+            authDomain: "js-design-bc571.firebaseapp.com",
+            projectId: "js-design-bc571",
+            storageBucket: "js-design-bc571.firebasestorage.app",
+            messagingSenderId: "637583793931",
+            appId: "1:637583793931:web:7f313d62460a86bea44c0e",
+            measurementId: "G-6836CW82RW"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // AdMob ID (WebToNative)
+        const ADMOB_REWARDED_ID = "ca-app-pub-6648413942656767/2699182382"; 
+
+        // --- DOM ELEMENTS ---
+        const loading = document.getElementById('loading');
+        const loginScreen = document.getElementById('login-screen');
+        const appContainer = document.getElementById('app-container');
+        
+        let isLoginMode = true;
+
+        // --- AUTH STATE CHECK ---
+        onAuthStateChanged(auth, (user) => {
+            loading.style.display = 'none';
+            if (user) {
+                loginScreen.style.display = 'none';
+                appContainer.style.display = 'flex';
+                document.getElementById('userDisplay').innerText = "Logged in as: " + user.email;
+                setTimeout(() => { drawCanvas(); }, 100);
+            } else {
+                loginScreen.style.display = 'flex';
+                appContainer.style.display = 'none';
+            }
+        });
+
+        // --- LOGIN / REGISTER LOGIC ---
+        window.toggleAuthMode = function() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('formTitle').innerText = isLoginMode ? 'Welcome Back' : 'Create Account';
+            document.getElementById('authBtn').innerText = isLoginMode ? 'Login' : 'Register';
+            document.getElementById('switchText').innerText = isLoginMode ? "Don't have an account? Register" : "Already have an account? Login";
+        }
+
+        window.handleAuth = function() {
+            const email = document.getElementById('email').value.trim();
+            const pass = document.getElementById('password').value.trim();
+
+            if(!email || !pass) { alert("Please enter email and password."); return; }
+            if(pass.length < 6) { alert("Password must be at least 6 characters."); return; }
+
+            document.getElementById('authBtn').innerText = "Please wait...";
+
+            if(isLoginMode) {
+                signInWithEmailAndPassword(auth, email, pass)
+                .then(() => { document.getElementById('authBtn').innerText = "Login"; })
+                .catch((error) => { alert("Login Failed: " + error.message); document.getElementById('authBtn').innerText = "Login"; });
+            } else {
+                createUserWithEmailAndPassword(auth, email, pass)
+                .then(() => { alert("Account Created Successfully!"); })
+                .catch((error) => { alert("Error: " + error.message); document.getElementById('authBtn').innerText = "Register"; });
+            }
+        }
+
+        window.logoutUser = function() {
+            signOut(auth).then(() => { alert("Logged out successfully."); });
+        }
+
+        // --- ABOUT MODAL ---
+        window.showAbout = function() { document.getElementById('about-modal').style.display = 'flex'; }
+        window.hideAbout = function() { document.getElementById('about-modal').style.display = 'none'; }
+
+        // --- DESIGN CANVAS LOGIC ---
+        const canvas = document.getElementById('designCanvas');
+        const ctx = canvas.getContext('2d');
+
+        window.drawCanvas = function() {
+            const bgColor = document.getElementById('bgColor').value;
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = "rgba(255,255,255,0.2)";
+            ctx.lineWidth = 10;
+            ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
+
+            const text = document.getElementById('designText').value;
+            const textColor = document.getElementById('textColor').value;
+            const textSize = document.getElementById('textSize').value;
+
+            if (text.trim() !== "") {
+                ctx.font = `bold ${textSize}px Poppins`;
+                ctx.fillStyle = textColor;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                
+                ctx.shadowColor = "rgba(0,0,0,0.5)";
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetX = 2;
+                ctx.shadowOffsetY = 2;
+
+                const words = text.split(' ');
+                let line = '';
+                let lines = [];
+                const maxWidth = canvas.width - 80;
+                const lineHeight = parseInt(textSize) + 15;
+
+                for(let n = 0; n < words.length; n++) {
+                    let testLine = line + words[n] + ' ';
+                    let metrics = ctx.measureText(testLine);
+                    if (metrics.width > maxWidth && n > 0) {
+                        lines.push(line);
+                        line = words[n] + ' ';
+                    } else { line = testLine; }
+                }
+                lines.push(line);
+
+                let startY = (canvas.height / 2) - ((lines.length - 1) * lineHeight) / 2;
+                for (let i = 0; i < lines.length; i++) {
+                    ctx.fillText(lines[i], canvas.width / 2, startY + (i * lineHeight));
+                }
+                ctx.shadowColor = "transparent";
+            }
+        }
+
+        // --- AD & DOWNLOAD LOGIC ---
+        window.downloadDesign = function() {
+            if (typeof WTN !== 'undefined' && WTN.AdMob) {
+                try {
+                    WTN.AdMob.rewardsAd({
+                        adId: ADMOB_REWARDED_ID,
+                        rewardsAdCallback: function(responseString) {
+                            let response = JSON.parse(responseString);
+                            if (response.status === "rewardSuccess") { saveImage(); } 
+                            else if (response.status === "adDismissed") { alert("Please watch the full ad to save your design."); }
+                        }
+                    });
+                } catch(e) { saveImage(); }
+            } else { saveImage(); }
+        }
+
+        function saveImage() {
+            const link = document.createElement('a');
+            link.download = 'design_' + Date.now() + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            alert("Design Saved Successfully!");
+        }
+    </script>
+</body>
+</html>
